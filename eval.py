@@ -350,6 +350,8 @@ def main(
     num_responses: int = typer.Option(1, help="Candidates per turn (>1 enables branching)"),
     num_grades: int = typer.Option(1, help="Number of grades per grader model"),
     every_turn: bool = typer.Option(False, help="Score every assistant turn individually"),
+    shuffle: bool = typer.Option(False, help="Shuffle the dataset before eval"),
+    seed: int = typer.Option(None, help="Random seed for reproducibility (shuffle + rejection picks)"),
     log_dir: str = typer.Option("logs", help="Directory for eval logs"),
 ):
     """Run an emotion-elicitation eval with configurable solver and scorer.
@@ -379,9 +381,13 @@ def main(
         typer.echo("Error: --num-responses and --grader-models/--num-grades are mutually exclusive.", err=True)
         raise typer.Exit(code=1)
 
+    # ── Seed for reproducibility ──
+    if seed is not None:
+        random.seed(seed)
+
     rubric = Path(judge_prompt).read_text()
     rejection_list = list(srsly.read_jsonl(rejections))
-    eval_dataset = json_dataset(questions, FieldSpec(input="prompt"))
+    eval_dataset = json_dataset(questions, FieldSpec(input="prompt"), shuffle=shuffle, seed=seed)
 
     # ── Resolve grader config for metadata ──
     if grader_models is not None:
@@ -402,6 +408,8 @@ def main(
         "samples_tested": samples_tested,
         "num_responses": num_responses,
         "every_turn": every_turn,
+        "shuffle": shuffle,
+        "seed": seed,
         "log_dir": log_dir,
         "mode": "branching" if use_branching else "multi_grader" if use_multi_grader else "simple",
     }
